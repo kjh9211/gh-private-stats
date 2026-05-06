@@ -1,0 +1,28 @@
+{
+  "name": "github-repo-img",
+  "version": "1.0.0",
+  "description": "GitHub private stats image service — renders SVG language charts from private repos",
+  "main": "src/app.js",
+  "scripts": {
+    "start": "node src/app.js",
+    "dev": "nodemon src/app.js",
+    "migrate": "node src/db/migrate.js"
+  },
+  "dependencies": {
+    "axios": "^1.7.2",
+    "crypto": "*",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "express-rate-limit": "^7.3.1",
+    "express-session": "^1.18.0",
+    "ioredis": "^5.10.1",
+    "layercache": "^2.1.0",
+    "pg": "^8.12.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

@@ -1,5 +1,5 @@
-const pool = require("./index");
 const crypto = require("crypto");
+const pool = require("./index");
 
 function generatePublicToken() {
   return crypto.randomBytes(32).toString("hex");

@@ -1,15 +1,16 @@
--- Users table: stores GitHub OAuth access tokens server-side
+-- Users: stores GitHub OAuth access tokens server-side (never exposed to client)
 CREATE TABLE IF NOT EXISTS users (
-  id          SERIAL PRIMARY KEY,
-  github_id   BIGINT UNIQUE NOT NULL,
-  username    VARCHAR(255) NOT NULL,
+  id           SERIAL PRIMARY KEY,
+  github_id    BIGINT UNIQUE NOT NULL,
+  username     VARCHAR(255) NOT NULL,
   access_token TEXT NOT NULL,
-  scope       VARCHAR(255),
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  scope        VARCHAR(255),
+  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Tokens table: public tokens issued to users for README embeds
+-- Tokens: public tokens issued to users for README embeds
+-- These map to a user_id but NEVER expose the GitHub access_token
 CREATE TABLE IF NOT EXISTS tokens (
   id           SERIAL PRIMARY KEY,
   user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

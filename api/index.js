@@ -1,3 +1,4 @@
 // Vercel serverless entry point.
-// Vercel imports this file and calls the exported Express app as a handler.
-module.exports = require("../src/app");
+// Vercel's @vercel/node runtime imports this file and calls the exported
+// Express app as an HTTP handler — no app.listen() needed.
+module.exports = require("../app");

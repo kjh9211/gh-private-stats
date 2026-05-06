@@ -1,5 +1,9 @@
 const pool = require("./index");
 
+/**
+ * Insert or update a user record after OAuth login.
+ * The GitHub access_token is stored server-side and NEVER returned to the client.
+ */
 async function upsertUser({ githubId, username, accessToken, scope }) {
   const { rows } = await pool.query(
     `INSERT INTO users (github_id, username, access_token, scope, updated_at)
@@ -9,23 +13,18 @@ async function upsertUser({ githubId, username, accessToken, scope }) {
            access_token = EXCLUDED.access_token,
            scope        = EXCLUDED.scope,
            updated_at   = NOW()
-     RETURNING *`,
+     RETURNING id, github_id, username, scope, created_at, updated_at`,
     [githubId, username, accessToken, scope]
   );
   return rows[0];
 }
 
 async function findUserById(id) {
-  const { rows } = await pool.query("SELECT * FROM users WHERE id = $1", [id]);
-  return rows[0] || null;
-}
-
-async function findUserByGithubId(githubId) {
   const { rows } = await pool.query(
-    "SELECT * FROM users WHERE github_id = $1",
-    [githubId]
+    "SELECT id, github_id, username, access_token, scope FROM users WHERE id = $1",
+    [id]
   );
   return rows[0] || null;
 }
 
-module.exports = { upsertUser, findUserById, findUserByGithubId };
+module.exports = { upsertUser, findUserById };

@@ -2,21 +2,21 @@
   "name": "github-repo-img",
   "version": "1.0.0",
   "description": "GitHub private stats image service — renders SVG language charts from private repos",
-  "main": "src/app.js",
+  "main": "app.js",
   "scripts": {
-    "start": "node src/app.js",
-    "dev": "nodemon src/app.js",
-    "migrate": "node src/db/migrate.js",
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "migrate": "node db/migrate.js",
     "vercel-build": "echo 'No build step required'"
   },
   "dependencies": {
     "axios": "^1.7.2",
-    "connect-pg-simple": "^10.0.0",
+    "cookie-parser": "^1.4.7",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-rate-limit": "^7.3.1",
-    "express-session": "^1.18.0",
     "ioredis": "^5.10.1",
+    "jsonwebtoken": "^9.0.3",
     "layercache": "^2.1.0",
     "pg": "^8.12.0"
   },

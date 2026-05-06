@@ -92,15 +92,29 @@ router.get("/toplang", ipLimiter, tokenLimiter, async (req, res) => {
   const topN = Math.min(Math.max(parseInt(top || "8", 10) || 8, 1), 20);
 
   try {
-    // 4. Fetch stats — layercache returns cached value when available
-    const stats = await getOrFetch(user.id, () =>
-      fetchLanguageStats(user.access_token, { excludeForks: true, hideLangs, topN })
+    // 4. Fetch full raw stats (all languages) — layercache returns cached value when available.
+    //    The cache key is user:${id}:stats (fixed per user), so one cached entry serves
+    //    all query-param combinations. Display options are applied after retrieval.
+    const allStats = await getOrFetch(user.id, () =>
+      fetchLanguageStats(user.access_token, { excludeForks: true })
     );
 
-    // 5. Update token's last_used_at (fire-and-forget; failure is non-fatal)
+    // 5. Apply display filters post-cache so they never pollute the cached data.
+    //    Recalculate percentages relative to the visible subset.
+    const visible = allStats
+      .filter((s) => !hideLangs.includes(s.name))
+      .slice(0, topN);
+
+    const visibleTotal = visible.reduce((sum, s) => sum + s.bytes, 0);
+    const stats = visible.map((s) => ({
+      ...s,
+      percent: visibleTotal > 0 ? (s.bytes / visibleTotal) * 100 : 0,
+    }));
+
+    // 6. Update token's last_used_at (fire-and-forget; failure is non-fatal)
     touchToken(token).catch(() => {});
 
-    // 6. Render and return SVG
+    // 7. Render and return SVG
     const svg = renderSvg(stats, { theme: theme === "light" ? "light" : "dark" });
     return sendSvg(res, svg);
 

@@ -10,37 +10,39 @@ const router = express.Router();
 
 const CACHE_TTL = parseInt(process.env.CACHE_TTL_SECONDS || "300");
 
-// ── Rate limiters ─────────────────────────────────────────────────────────────
-// Both return SVG error cards so README embeds degrade gracefully.
-
-const ipLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_PER_IP || "60"),
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => req.ip,
-  handler: (_req, res) =>
-    sendSvgError(res, "Rate limit exceeded. Try again later.", 429),
-});
-
+// ── Rate limiter ──────────────────────────────────────────────────────────────
+// Only token-based limiting is applied to /api/toplang.
+//
+// IP-based limiting is intentionally NOT used here because GitHub proxies all
+// README image requests through camo.githubusercontent.com (a small pool of
+// shared AWS IPs). An IP limiter would aggregate traffic from every user whose
+// README embeds this service and trigger false positives.
+//
+// The token limiter is the correct unit: each public_token belongs to one user,
+// so it naturally isolates per-user traffic regardless of the requesting IP.
 const tokenLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: parseInt(process.env.RATE_LIMIT_PER_TOKEN || "20"),
+  max: parseInt(process.env.RATE_LIMIT_PER_TOKEN || "30"),
   standardHeaders: true,
   legacyHeaders: false,
   keyGenerator: (req) => req.query.token || req.ip,
   handler: (_req, res) =>
-    sendSvgError(res, "Token rate limit exceeded. Try again later.", 429),
+    sendSvgError(res, "Rate limit exceeded. Try again later.", 429),
 });
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function sendSvg(res, svg, status = 200) {
+  // s-maxage: tells Vercel Edge Network and GitHub's camo proxy how long to
+  //           cache this response at the CDN layer (shared cache TTL).
+  // Expires:  HTTP/1.0 fallback; camo and some intermediate proxies prefer it.
+  const expires = new Date(Date.now() + CACHE_TTL * 1000).toUTCString();
   res
     .status(status)
     .set({
       "Content-Type":           "image/svg+xml; charset=utf-8",
-      "Cache-Control":          `public, max-age=${CACHE_TTL}`,
+      "Cache-Control":          `public, max-age=${CACHE_TTL}, s-maxage=${CACHE_TTL}`,
+      "Expires":                expires,
       "X-Content-Type-Options": "nosniff",
     })
     .send(svg);
@@ -65,7 +67,7 @@ function sendSvgError(res, message, status = 400, theme) {
 //   top                — number of languages to show (1-20, default 8)
 //
 // Returns image/svg+xml. The GitHub access token is NEVER exposed.
-router.get("/toplang", ipLimiter, tokenLimiter, async (req, res) => {
+router.get("/toplang", tokenLimiter, async (req, res) => {
   const { token, theme, hide, top } = req.query;
   const themeObj = theme === "light" ? LIGHT : undefined;
 
@@ -99,14 +101,16 @@ router.get("/toplang", ipLimiter, tokenLimiter, async (req, res) => {
       fetchLanguageStats(user.access_token, { excludeForks: true })
     );
 
-    // 5. Build display data from raw cache — three explicit steps, always in order:
-    //    ① hide  — remove languages the caller doesn't want
-    //    ② top   — keep only the N highest-byte languages
-    //    ③ percent — calculated from the final visible set (bytes sum = 100 %)
-    const hidden  = allStats.filter((s) => !hideLangs.includes(s.name)); // ① hide
-    const topped  = hidden.slice(0, topN);                                // ② top
+    // 5. Build display data — four explicit steps, always in this order:
+    //    ① sort    — bytes descending (route owns sort; never relies on cache order)
+    //    ② hide    — remove languages the caller doesn't want
+    //    ③ top     — keep only the N highest-byte entries
+    //    ④ percent — recalculated from the final visible set (always sums to 100 %)
+    const sorted  = [...allStats].sort((a, b) => b.bytes - a.bytes);     // ① sort
+    const hidden  = sorted.filter((s) => !hideLangs.includes(s.name));   // ② hide
+    const topped  = hidden.slice(0, topN);                                // ③ top
     const total   = topped.reduce((sum, s) => sum + s.bytes, 0);
-    const stats   = topped.map((s) => ({                                  // ③ percent
+    const stats   = topped.map((s) => ({                                  // ④ percent
       name:    s.name,
       bytes:   s.bytes,
       percent: total > 0 ? (s.bytes / total) * 100 : 0,

@@ -99,16 +99,17 @@ router.get("/toplang", ipLimiter, tokenLimiter, async (req, res) => {
       fetchLanguageStats(user.access_token, { excludeForks: true })
     );
 
-    // 5. Apply display filters post-cache so they never pollute the cached data.
-    //    Recalculate percentages relative to the visible subset.
-    const visible = allStats
-      .filter((s) => !hideLangs.includes(s.name))
-      .slice(0, topN);
-
-    const visibleTotal = visible.reduce((sum, s) => sum + s.bytes, 0);
-    const stats = visible.map((s) => ({
-      ...s,
-      percent: visibleTotal > 0 ? (s.bytes / visibleTotal) * 100 : 0,
+    // 5. Build display data from raw cache — three explicit steps, always in order:
+    //    ① hide  — remove languages the caller doesn't want
+    //    ② top   — keep only the N highest-byte languages
+    //    ③ percent — calculated from the final visible set (bytes sum = 100 %)
+    const hidden  = allStats.filter((s) => !hideLangs.includes(s.name)); // ① hide
+    const topped  = hidden.slice(0, topN);                                // ② top
+    const total   = topped.reduce((sum, s) => sum + s.bytes, 0);
+    const stats   = topped.map((s) => ({                                  // ③ percent
+      name:    s.name,
+      bytes:   s.bytes,
+      percent: total > 0 ? (s.bytes / total) * 100 : 0,
     }));
 
     // 6. Update token's last_used_at (fire-and-forget; failure is non-fatal)
